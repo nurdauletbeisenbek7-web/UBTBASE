@@ -1,71 +1,38 @@
-import { NextResponse } from "next/server";
-import OpenAI from "openai";
-import { createClient } from "@/lib/supabase/server";
+import { NextResponse } from 'next/server';
+import { GoogleGenAI } from '@google/genai';
 
-function getOpenAI() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-}
+// Инициализируем Gemini с помощью ключа из переменных окружения
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json(
-      { error: "OpenAI API key not configured" },
-      { status: 500 }
-    );
-  }
-
-  const { question, options, userAnswer, correctAnswer, subject, topic } =
-    await request.json();
-
-  const userAnswerText = options[userAnswer];
-  const correctAnswerText = options[correctAnswer];
-
-  const prompt = `You are a helpful UNT (Unified National Testing) tutor for Kazakhstan students.
-
-Subject: ${subject}
-Topic: ${topic}
-
-Question: ${question}
-
-Options:
-A) ${options[0]}
-B) ${options[1]}
-C) ${options[2]}
-D) ${options[3]}
-
-Student's answer: ${String.fromCharCode(65 + userAnswer)}) ${userAnswerText}
-Correct answer: ${String.fromCharCode(65 + correctAnswer)}) ${correctAnswerText}
-
-Please explain in clear, student-friendly language:
-1. Why the student's answer is wrong
-2. The correct theory/concept needed
-3. Step-by-step how to solve similar problems
-
-Keep the explanation concise but thorough (3-4 paragraphs max).`;
-
+export async function POST(req: Request) {
   try {
-    const completion = await getOpenAI().chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 800,
+    const { question, answer, correctAnswer, explanation } = await req.json();
+
+    // Формируем четкий промпт для ИИ
+    const prompt = `
+      Ты — опытный преподаватель и ментор. Объясни пользователю, почему его ответ неверный, и подробно разбери правильный вариант.
+      
+      Вопрос: ${question}
+      Ответ пользователя: ${answer}
+      Правильный ответ: ${correctAnswer}
+      Базовое объяснение: ${explanation || 'Не указано'}
+      
+      Дай развернутый, понятный и мотивирующий ответ на русском языке. Используй markdown для форматирования.
+    `;
+
+    // Вызываем модель gemini-2.5-flash (она бесплатная и быстрая)
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
     });
 
-    const explanation =
-      completion.choices[0]?.message?.content ?? "No explanation available.";
+    const aiExplanation = response.text;
 
-    return NextResponse.json({ explanation });
-  } catch {
+    return NextResponse.json({ explanation: aiExplanation });
+  } catch (error: any) {
+    console.error('Gemini API Error:', error);
     return NextResponse.json(
-      { error: "Failed to generate explanation" },
+      { error: 'Failed to generate explanation', details: error.message },
       { status: 500 }
     );
   }
