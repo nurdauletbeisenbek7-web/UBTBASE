@@ -30,9 +30,9 @@ export async function POST(req: Request) {
 
     // Вызываем стабильную модель
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: prompt,
-    });
+  model: 'gemini-2.5-flash', // или 'gemini-2.0-flash'
+  contents: prompt,
+});
 
     const aiExplanation = response.text || 'Не удалось сгенерировать текст.';
 
