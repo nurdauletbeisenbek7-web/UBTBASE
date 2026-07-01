@@ -1,43 +1,45 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
-// Инициализируем Gemini с помощью ключа из переменных окружения
+// Инициализируем строго через переменную окружения
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function POST(req: Request) {
   try {
-    const { question, answer, correctAnswer, explanation } = await req.json();
+    // Безопасно парсим JSON, если тело запроса пустое — берём пустой объект
+    const body = await req.json().catch(() => ({}));
+    const { question, answer, correctAnswer, explanation } = body;
 
-    // Формируем четкий промпт для ИИ
+    // Жёсткий и лаконичный промпт
     const prompt = `
       Ты — строгий бэкенд-модуль объяснения ошибок в тестах. 
-  Твоя задача — дать максимально краткий, сухой и технический разбор.
-  
-  ЗАПРЕЩЕНО: Приветствовать пользователя, использовать фразы вроде "Не переживай", "Отличная попытка", делать вступления и выводы.
-  ЕСЛИ данные пустые или некорректные — напиши просто: "Ошибка: данные вопроса не переданы".
-  
-  ДАННЫЕ ДЛЯ РАЗБОРА:
-  Вопрос: ${question || 'Не указан'}
-  Неверный ответ пользователя: ${answer || 'Не указан'}
-  Правильный ответ: ${correctAnswer || 'Не указан'}
-  Контекст: ${explanation || 'Не указан'}
-  
-  Формат ответа:
-  1. Почему ответ пользователя неверный (1-2 предложения).
-  2. Почему правильный ответ верен (1-2 предложения).
-`;
+      Твоя задача — дать максимально краткий, сухой и технический разбор.
+      
+      ЗАПРЕЩЕНО: Приветствовать пользователя, делать вступления и выводы.
+      
+      ДАННЫЕ ДЛЯ РАЗБОРА:
+      Вопрос: ${question || 'Не указан'}
+      Неверный ответ пользователя: ${answer || 'Не указан'}
+      Правильный ответ: ${correctAnswer || 'Не указан'}
+      Контекст: ${explanation || 'Не указан'}
+      
+      Формат ответа:
+      1. Почему ответ пользователя неверный (1-2 предложения).
+      2. Почему правильный ответ верен (1-2 предложения).
+    `;
 
-    // Вызываем модель gemini-1.5-flash (она бесплатная и быстрая)
+    // Вызываем стабильную модель
     const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
       contents: prompt,
     });
 
-    const aiExplanation = response.text;
+    const aiExplanation = response.text || 'Не удалось сгенерировать текст.';
 
     return NextResponse.json({ explanation: aiExplanation });
   } catch (error: any) {
-    console.error('Gemini API Error:', error);
+    // Выводим ошибку в консоль Vercel для отладки
+    console.error('Gemini API Ошибка:', error);
     return NextResponse.json(
       { error: 'Failed to generate explanation', details: error.message },
       { status: 500 }
