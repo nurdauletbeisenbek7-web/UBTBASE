@@ -20,9 +20,9 @@ export async function POST(req: Request) {
       Дай развернутый, понятный и мотивирующий ответ на русском языке. Используй markdown для форматирования.
     `;
 
-    // Вызываем модель gemini-2.5-flash (она бесплатная и быстрая)
+    // Вызываем модель gemini-1.5-flash (она бесплатная и быстрая)
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       contents: prompt,
     });
 
